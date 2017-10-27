@@ -109,7 +109,7 @@ function startDownload(){
           var reader = new FileReader();
           reader.onload = (function(theFile) {
           return function(e) {
-          fileblobs[theFile.name]=(e.target.result);
+          fileblobs[theFile.name.toLowerCase()]=(e.target.result);
           checkRemaining();
           };
         })(file);
@@ -254,7 +254,7 @@ function checkRemaining(){
     a.download = glbfilename+".glb";
     document.getElementById("downloadBtn").disabled=false;
     document.getElementById("downloadBtn").textContent="Download .glb";
-
+    a.click();
 }
 
 
@@ -274,7 +274,7 @@ function dataFromUri(buffer) {
     }
     else {
       var filename=buffer.uri.substr(buffer.uri.lastIndexOf('/')+1);
-      return fileblobs[filename];
+      return fileblobs[filename.toLowerCase()];
     }
 }
 function alignedLength(value) {
@@ -304,7 +304,8 @@ function getMimeType(filename) {
 var gltfMimeTypes = {
     'image/png': ['png'],
     'image/jpeg': ['jpg', 'jpeg'],
-    'text/plain': ['glsl', 'vert', 'vs', 'frag', 'fs', 'txt']
+    'text/plain': ['glsl', 'vert', 'vs', 'frag', 'fs', 'txt'],
+    'image/vnd-ms.dds': ['dds']
 };
 
 </script>
