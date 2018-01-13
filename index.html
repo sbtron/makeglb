@@ -162,7 +162,7 @@ function processBuffers(){
         var bufferIndex = gltf.buffers.length;
         var images = gltf.images || [];
         var pendingImages = images.map(function (image) {
-          dataFromUri(image).then(function(data) {
+          return dataFromUri(image).then(function(data) {
             if (data === undefined) {
                 delete image['uri'];
                 return;
