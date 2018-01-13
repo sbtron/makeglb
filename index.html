@@ -40,10 +40,10 @@
 
 
 
-  function handleDragOver(evt) {
-    evt.stopPropagation();
-    evt.preventDefault();
-    evt.dataTransfer.dropEffect = 'copy'; 
+  function handleDragOver(event) {
+    event.stopPropagation();
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
   }
 
   
@@ -59,29 +59,29 @@
     btn.onclick= startDownload;
     btn.appendChild(document.createTextNode("Processing..."));
     document.getElementById("download").appendChild(btn);
-}
+  }
 
-function startDownload(){
-    document.getElementById("downloadLink").click();
-}
+  function startDownload(){
+      document.getElementById("downloadLink").click();
+  }
 
-  function handleFileSelect(evt) {
-    evt.stopPropagation();
-    evt.preventDefault();
+  function handleFileSelect(event) {
+    event.stopPropagation();
+    event.preventDefault();
     document.getElementById('list').innerHTML="";
     addDownloadButton();
-  var items = event.dataTransfer.items;
-  remainingfilestoprocess=items.length;
-  for (var i=0; i<items.length; i++) {    
-    if (items[i].getAsEntry) {
-    var entry = items[i].getAsEntry();
-     } else if (items[i].webkitGetAsEntry) {
-     var entry = items[i].webkitGetAsEntry();
+    var items = event.dataTransfer.items;
+    remainingfilestoprocess=items.length;
+    for (var i=0; i<items.length; i++) {
+      if (items[i].getAsEntry) {
+      var entry = items[i].getAsEntry();
+       } else if (items[i].webkitGetAsEntry) {
+       var entry = items[i].webkitGetAsEntry();
+      }
+      if (entry) {
+          traverseFileTree(entry);
+      }
     }
-    if (entry) {
-        traverseFileTree(entry);
-    }
-  }
   }
 
   function traverseFileTree(item, path) {
