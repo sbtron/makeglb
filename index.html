@@ -1,6 +1,6 @@
 <html>
   <head>
-  <Title>Make glb</Title>  
+  <Title>Make glb</Title>
   <style>
  .area {
   width: 45em;
@@ -38,6 +38,9 @@
   var remainingfilestoprocess=0;
   var glbfilename;
 
+  var outputBuffers;
+  var bufferMap;
+  var bufferOffset;
 
 
   function handleDragOver(event) {
@@ -46,7 +49,7 @@
     event.dataTransfer.dropEffect = 'copy';
   }
 
-  
+
   var dropZone = document.getElementById('drop_zone');
   dropZone.addEventListener('dragover', handleDragOver, false);
   dropZone.addEventListener('drop', handleFileSelect, false);
@@ -133,47 +136,36 @@
 function checkRemaining(){
     remainingfilestoprocess--;
     if(remainingfilestoprocess===0){
-        fileSave();
+      outputBuffers = [];
+      bufferMap = new Map();
+      bufferOffset = 0;
+      processBuffers().then(fileSave);
     }
 }
 
-  function fileSave(){
-  var Binary = {
-          Magic: 0x46546C67
-      };
-
-      var bufferMap = new Map();
-      var bufferOffset = 0;
-      var outputBuffers = [];
-      var bufferIndex = 0;
-        for (; bufferIndex < gltf.buffers.length; bufferIndex++) {
-        var buffer = gltf.buffers[bufferIndex];
-        var data = dataFromUri(buffer);
+function processBuffers(){
+  var pendingBuffers = gltf.buffers.map(function (buffer, bufferIndex) {
+    return dataFromUri(buffer)
+      .then(function(data) {
         if (data !== undefined) {
-            outputBuffers.push(data);
+          outputBuffers.push(data);
         }
-        delete buffer['uri'];
-        buffer['byteLength'] = data.byteLength;
+        delete buffer.uri;
+        buffer.byteLength = data.byteLength;
         bufferMap.set(bufferIndex, bufferOffset);
         bufferOffset += alignedLength(data.byteLength);
-    }
-    for (var _i = 0, _a = gltf.bufferViews; _i < _a.length; _i++) {
-        var bufferView = _a[_i];
-        if(bufferView.byteOffset=== undefined){
-            bufferView.byteOffset=0;
-        }
-        else{
-        bufferView.byteOffset = bufferView.byteOffset + bufferMap.get(bufferView.buffer);
-      }
-        bufferView.buffer = 0;
-    }
-    if (gltf.images !== undefined) {
-        for (var _b = 0, _c = gltf.images; _b < _c.length; _b++) {
-            var image = _c[_b];
-            var data = dataFromUri(image);
+      });
+  });
+
+  return Promise.all(pendingBuffers)
+    .then(function() {
+        var bufferIndex = gltf.buffers.length;
+        var images = gltf.images || [];
+        var pendingImages = images.map(function (image) {
+          return dataFromUri(image).then(function(data) {
             if (data === undefined) {
                 delete image['uri'];
-                continue;
+                return;
             }
             var bufferView = {
                 buffer: 0,
@@ -189,19 +181,39 @@ function checkRemaining(){
             image['bufferView'] = bufferViewIndex;
             image['mimeType'] = getMimeType(image.uri);
             delete image['uri'];
+          });
+        });
+        return Promise.all(pendingImages);
+    });
+}
+
+function fileSave(){
+    var Binary = {
+        Magic: 0x46546C67
+    };
+
+    for (var _i = 0, _a = gltf.bufferViews; _i < _a.length; _i++) {
+        var bufferView = _a[_i];
+        if(bufferView.byteOffset=== undefined){
+            bufferView.byteOffset=0;
         }
+        else{
+        bufferView.byteOffset = bufferView.byteOffset + bufferMap.get(bufferView.buffer);
+      }
+        bufferView.buffer = 0;
     }
     var binBufferSize = bufferOffset;
     gltf.buffers = [{
-            byteLength: binBufferSize
-        }];
+        byteLength: binBufferSize
+    }];
 
     var enc = new TextEncoder();
     var jsonBuffer = enc.encode(JSON.stringify(gltf));
     var jsonAlignedLength = alignedLength(jsonBuffer.length);
+    var padding;
     if (jsonAlignedLength !== jsonBuffer.length) {
 
-        var padding = jsonAlignedLength- jsonBuffer.length;
+        padding = jsonAlignedLength- jsonBuffer.length;
     }
     var totalSize = 12 + // file header: magic + version + length
         8 + // json chunk header: json length + type
@@ -231,7 +243,7 @@ function checkRemaining(){
         for (var j=0;j<padding;j++){
             dataView.setUint8(bufIndex, 0x20);
         bufIndex++;
-    }   
+    }
     }
 
     // BIN
@@ -240,7 +252,7 @@ function checkRemaining(){
     dataView.setUint32(bufIndex, 0x004E4942, true);
     bufIndex += 4;
     for (var i = 0; i < outputBuffers.length; i++) {
-      var bufoffset = bufIndex + bufferMap.get(i);    
+      var bufoffset = bufIndex + bufferMap.get(i);
       var buf = new Uint8Array(outputBuffers[i]);
       var thisbufindex=bufoffset;
       for (var j=0;j<buf.byteLength;j++){
@@ -258,23 +270,20 @@ function checkRemaining(){
 }
 
 
-  function isBase64(uri) {
+function isBase64(uri) {
     return uri.length < 5 ? false : uri.substr(0, 5) === "data:";
 }
 function decodeBase64(uri) {
-    //Todo
-    return undefined;
+    return fetch(uri).then(function(response) { return response.arrayBuffer(); });
 }
 function dataFromUri(buffer) {
     if (buffer.uri === undefined) {
-        return undefined;
-    }
-    if (isBase64(buffer.uri)) {
-        return decodeBase64(buffer.uri);
-    }
-    else {
+      return Promise.resolve(undefined);
+    } else if (isBase64(buffer.uri)) {
+      return decodeBase64(buffer.uri);
+    } else {
       var filename=buffer.uri.substr(buffer.uri.lastIndexOf('/')+1);
-      return fileblobs[filename.toLowerCase()];
+      return Promise.resolve(fileblobs[filename.toLowerCase()]);
     }
 }
 function alignedLength(value) {
